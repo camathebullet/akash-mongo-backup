@@ -1,0 +1,79 @@
+---
+version: "2.0"
+services:
+  mongodb:
+    image: mongo:8.0.13
+    expose:
+      - port: 27017
+        as: 27017
+        to:
+          - global: true
+          - service: backupagent
+    env:
+      - MONGO_INITDB_ROOT_USERNAME=${USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${PASSWORD}
+    params:
+      storage:
+        data:
+          mount: /mnt/data
+          readOnly: false
+  backupagent:
+    image: camathebullet/backup-agent:0.4
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_USER=${USERNAME}
+      - MONGO_PASS=${PASSWORD}
+      - FILEBASE_BUCKET=${FILEBASE_BUCKET}
+      - FILEBASE_ACCESS_KEY=${FILEBASE_ACCESS_KEY}
+      - FILEBASE_SECRET_KEY=${FILEBASE_SECRET_KEY}
+      - RETENTION_COUNT=7
+      - BACKUP_INTERVAL=43200
+    depends_on:
+      - mongodb
+profiles:
+  compute:
+    mongodb:
+      resources:
+        cpu:
+          units: 1
+        memory:
+          size: 1gi
+        storage:
+          - size: 2Gi
+          - name: data
+            size: 10Gi
+            attributes:
+              persistent: true
+              class: beta2
+    backupagent:
+      resources:
+        cpu:
+          units: 1
+        memory:
+          size: 1gi
+        storage:
+          - size: 1Gi
+  placement:
+    dcloud:
+      pricing:
+        mongodb:
+          denom: uakt
+          amount: 100000
+        backupagent:
+          denom: uakt
+          amount: 100000
+deployment:
+  mongodb:
+    dcloud:
+      profile: mongodb
+      count: 1
+  backupagent:
+    dcloud:
+      profile: backupagent
+      count: 1
